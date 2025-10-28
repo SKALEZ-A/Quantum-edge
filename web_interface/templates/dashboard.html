@@ -1,0 +1,876 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }}</title>
+
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Socket.IO -->
+    <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
+
+    <style>
+        :root {
+            --primary-color: #007bff;
+            --secondary-color: #6c757d;
+            --success-color: #28a745;
+            --warning-color: #ffc107;
+            --danger-color: #dc3545;
+            --dark-color: #343a40;
+            --light-color: #f8f9fa;
+        }
+
+        body {
+            background-color: #f5f5f5;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        .navbar-brand {
+            font-weight: bold;
+            color: white !important;
+        }
+
+        .card {
+            border: none;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            transition: transform 0.2s;
+        }
+
+        .card:hover {
+            transform: translateY(-2px);
+        }
+
+        .metric-card {
+            text-align: center;
+        }
+
+        .metric-value {
+            font-size: 2rem;
+            font-weight: bold;
+            color: var(--primary-color);
+        }
+
+        .metric-label {
+            font-size: 0.9rem;
+            color: var(--secondary-color);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .status-healthy {
+            color: var(--success-color);
+        }
+
+        .status-warning {
+            color: var(--warning-color);
+        }
+
+        .status-critical {
+            color: var(--danger-color);
+        }
+
+        .sidebar {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: white;
+        }
+
+        .sidebar .nav-link {
+            color: rgba(255,255,255,0.8);
+            padding: 0.75rem 1rem;
+            margin: 0.25rem 0;
+            border-radius: 5px;
+            transition: all 0.2s;
+        }
+
+        .sidebar .nav-link:hover {
+            color: white;
+            background-color: rgba(255,255,255,0.1);
+        }
+
+        .sidebar .nav-link.active {
+            background-color: rgba(255,255,255,0.2);
+            color: white;
+        }
+
+        .main-content {
+            padding: 2rem;
+        }
+
+        .chart-container {
+            position: relative;
+            height: 300px;
+            width: 100%;
+        }
+
+        .real-time-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background-color: var(--success-color);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        .quantum-effect {
+            background: linear-gradient(45deg, #667eea, #764ba2, #f093fb, #f5576c);
+            background-size: 400% 400%;
+            animation: gradientShift 3s ease infinite;
+        }
+
+        @keyframes gradientShift {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="/">
+                <i class="fas fa-brain"></i> Quantum Edge AI Platform
+            </a>
+
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link active" href="/">
+                            <i class="fas fa-tachometer-alt"></i> Dashboard
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/models">
+                            <i class="fas fa-cubes"></i> Models
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/monitoring">
+                            <i class="fas fa-chart-line"></i> Monitoring
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/analytics">
+                            <i class="fas fa-chart-bar"></i> Analytics
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid">
+        <div class="row">
+            <!-- Sidebar -->
+            <nav class="col-md-2 d-none d-md-block sidebar">
+                <div class="sidebar-sticky">
+                    <ul class="nav flex-column">
+                        <li class="nav-item">
+                            <a class="nav-link active" href="/">
+                                <i class="fas fa-home"></i> Overview
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#system-health">
+                                <i class="fas fa-heartbeat"></i> System Health
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#models">
+                                <i class="fas fa-robot"></i> AI Models
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#performance">
+                                <i class="fas fa-bolt"></i> Performance
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#security">
+                                <i class="fas fa-shield-alt"></i> Security
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#quantum">
+                                <i class="fas fa-atom"></i> Quantum Engine
+                            </a>
+                        </li>
+                    </ul>
+
+                    <hr class="my-3">
+
+                    <div class="px-3">
+                        <h6 class="text-white-50">QUICK ACTIONS</h6>
+                        <button class="btn btn-outline-light btn-sm w-100 mb-2" onclick="runInferenceTest()">
+                            <i class="fas fa-play"></i> Test Inference
+                        </button>
+                        <button class="btn btn-outline-light btn-sm w-100 mb-2" onclick="refreshMetrics()">
+                            <i class="fas fa-sync"></i> Refresh Metrics
+                        </button>
+                        <button class="btn btn-outline-light btn-sm w-100" onclick="exportReport()">
+                            <i class="fas fa-download"></i> Export Report
+                        </button>
+                    </div>
+                </div>
+            </nav>
+
+            <!-- Main Content -->
+            <main class="col-md-10 ms-sm-auto px-md-4 main-content">
+                <!-- Header -->
+                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+                    <h1 class="h2">
+                        <i class="fas fa-tachometer-alt text-primary"></i> System Dashboard
+                        <span class="real-time-indicator ms-2" title="Real-time updates active"></span>
+                    </h1>
+                    <div class="btn-toolbar mb-2 mb-md-0">
+                        <div class="btn-group me-2">
+                            <button type="button" class="btn btn-sm btn-outline-secondary" id="autoRefreshToggle" onclick="toggleAutoRefresh()">
+                                <i class="fas fa-pause"></i> Pause Updates
+                            </button>
+                        </div>
+                        <div class="dropdown">
+                            <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                                <i class="fas fa-cog"></i> Settings
+                            </button>
+                            <ul class="dropdown-menu">
+                                <li><a class="dropdown-item" href="#" onclick="openSettings()">Dashboard Settings</a></li>
+                                <li><a class="dropdown-item" href="#" onclick="exportData()">Export Data</a></li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li><a class="dropdown-item text-danger" href="#" onclick="resetDashboard()">Reset Dashboard</a></li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- System Health Overview -->
+                <section id="system-health" class="mb-5">
+                    <h3 class="mb-3">
+                        <i class="fas fa-heartbeat text-success"></i> System Health Overview
+                    </h3>
+
+                    <div class="row">
+                        <div class="col-md-3">
+                            <div class="card metric-card">
+                                <div class="card-body">
+                                    <div class="metric-value" id="cpuMetric">--</div>
+                                    <div class="metric-label">CPU Usage</div>
+                                    <div class="progress mt-2" style="height: 6px;">
+                                        <div class="progress-bar" id="cpuProgress" style="width: 0%"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-3">
+                            <div class="card metric-card">
+                                <div class="card-body">
+                                    <div class="metric-value" id="memoryMetric">--</div>
+                                    <div class="metric-label">Memory Usage</div>
+                                    <div class="progress mt-2" style="height: 6px;">
+                                        <div class="progress-bar bg-info" id="memoryProgress" style="width: 0%"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-3">
+                            <div class="card metric-card">
+                                <div class="card-body">
+                                    <div class="metric-value" id="diskMetric">--</div>
+                                    <div class="metric-label">Disk Usage</div>
+                                    <div class="progress mt-2" style="height: 6px;">
+                                        <div class="progress-bar bg-warning" id="diskProgress" style="width: 0%"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-3">
+                            <div class="card metric-card">
+                                <div class="card-body">
+                                    <div class="metric-value" id="clientsMetric">--</div>
+                                    <div class="metric-label">Active Clients</div>
+                                    <i class="fas fa-users text-primary mt-2" style="font-size: 1.2rem;"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- System Status Cards -->
+                    <div class="row mt-4">
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5 class="mb-0">
+                                        <i class="fas fa-server text-primary"></i> Platform Status
+                                    </h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <span>API Services</span>
+                                        <span class="badge bg-success">Healthy</span>
+                                    </div>
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <span>Model Inference</span>
+                                        <span class="badge bg-success">Active</span>
+                                    </div>
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <span>Database</span>
+                                        <span class="badge bg-success">Connected</span>
+                                    </div>
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <span>Quantum Engine</span>
+                                        <span class="badge bg-success">Ready</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5 class="mb-0">
+                                        <i class="fas fa-exclamation-triangle text-warning"></i> Active Alerts
+                                    </h5>
+                                </div>
+                                <div class="card-body">
+                                    <div id="alertsContainer">
+                                        <div class="alert alert-info">
+                                            <i class="fas fa-info-circle"></i> No active alerts
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Performance Charts -->
+                <section id="performance" class="mb-5">
+                    <h3 class="mb-3">
+                        <i class="fas fa-chart-line text-info"></i> Performance Metrics
+                    </h3>
+
+                    <div class="row">
+                        <div class="col-md-8">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5 class="mb-0">Real-time System Metrics</h5>
+                                </div>
+                                <div class="card-body">
+                                    <canvas id="systemMetricsChart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-4">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5 class="mb-0">Model Performance</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div id="modelPerformanceContainer">
+                                        <div class="text-center text-muted">
+                                            <i class="fas fa-spinner fa-spin fa-2x mb-3"></i>
+                                            <p>Loading model metrics...</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- AI Models Section -->
+                <section id="models" class="mb-5">
+                    <h3 class="mb-3">
+                        <i class="fas fa-robot text-primary"></i> Active AI Models
+                    </h3>
+
+                    <div class="row" id="modelsContainer">
+                        <!-- Models will be loaded dynamically -->
+                    </div>
+                </section>
+
+                <!-- Quantum Engine Section -->
+                <section id="quantum" class="mb-5">
+                    <h3 class="mb-3">
+                        <i class="fas fa-atom quantum-effect text-white px-2 py-1 rounded"></i> Quantum Engine Status
+                    </h3>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5 class="mb-0">Quantum Circuit Status</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between align-items-center mb-3">
+                                        <span>Active Circuits</span>
+                                        <span class="badge bg-primary">3</span>
+                                    </div>
+                                    <div class="d-flex justify-content-between align-items-center mb-3">
+                                        <span>Qubits Available</span>
+                                        <span class="badge bg-info">16/16</span>
+                                    </div>
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <span>Entanglement Strength</span>
+                                        <span class="badge bg-success">High</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5 class="mb-0">Quantum Advantage Metrics</h5>
+                                </div>
+                                <div class="card-body">
+                                    <canvas id="quantumAdvantageChart" class="chart-container"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </main>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+
+    <!-- Dashboard JavaScript -->
+    <script>
+        // Global variables
+        let socket;
+        let autoRefresh = true;
+        let metricsData = [];
+        let systemMetricsChart;
+        let quantumAdvantageChart;
+
+        // Initialize dashboard
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeSocket();
+            initializeCharts();
+            loadInitialData();
+            startAutoRefresh();
+        });
+
+        // Socket.IO connection
+        function initializeSocket() {
+            socket = io();
+
+            socket.on('connect', function() {
+                console.log('Connected to dashboard server');
+                socket.emit('subscribe_metrics');
+            });
+
+            socket.on('disconnect', function() {
+                console.log('Disconnected from dashboard server');
+            });
+
+            socket.on('metrics_update', function(data) {
+                updateMetrics(data);
+            });
+
+            socket.on('model_status', function(data) {
+                updateModelStatus(data);
+            });
+        }
+
+        // Initialize charts
+        function initializeCharts() {
+            // System metrics chart
+            const systemCtx = document.getElementById('systemMetricsChart').getContext('2d');
+            systemMetricsChart = new Chart(systemCtx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'CPU Usage (%)',
+                        borderColor: '#007bff',
+                        backgroundColor: 'rgba(0, 123, 255, 0.1)',
+                        data: [],
+                        tension: 0.4
+                    }, {
+                        label: 'Memory Usage (%)',
+                        borderColor: '#28a745',
+                        backgroundColor: 'rgba(40, 167, 69, 0.1)',
+                        data: [],
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 100
+                        }
+                    }
+                }
+            });
+
+            // Quantum advantage chart
+            const quantumCtx = document.getElementById('quantumAdvantageChart').getContext('2d');
+            quantumAdvantageChart = new Chart(quantumCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Classical Processing', 'Quantum Speedup', 'Entanglement Gain'],
+                    datasets: [{
+                        data: [60, 30, 10],
+                        backgroundColor: ['#6c757d', '#007bff', '#28a745'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        }
+                    }
+                }
+            });
+        }
+
+        // Load initial data
+        async function loadInitialData() {
+            try {
+                // Load system info
+                const systemResponse = await fetch('/api/system-info');
+                const systemData = await systemResponse.json();
+                updateSystemInfo(systemData);
+
+                // Load models
+                const modelsResponse = await fetch('/api/models');
+                const modelsData = await modelsResponse.json();
+                updateModelsDisplay(modelsData);
+
+                // Load initial metrics
+                const metricsResponse = await fetch('/api/monitoring/metrics');
+                const metricsData = await metricsResponse.json();
+                if (metricsData.timestamp) {
+                    updateMetrics(metricsData);
+                }
+
+            } catch (error) {
+                console.error('Error loading initial data:', error);
+            }
+        }
+
+        // Update system information display
+        function updateSystemInfo(data) {
+            // Update any system info displays if needed
+            console.log('System info updated:', data);
+        }
+
+        // Update metrics display
+        function updateMetrics(data) {
+            // Update metric cards
+            if (data.cpu_percent !== undefined) {
+                document.getElementById('cpuMetric').textContent = data.cpu_percent.toFixed(1) + '%';
+                document.getElementById('cpuProgress').style.width = data.cpu_percent + '%';
+            }
+
+            if (data.memory_percent !== undefined) {
+                document.getElementById('memoryMetric').textContent = data.memory_percent.toFixed(1) + '%';
+                document.getElementById('memoryProgress').style.width = data.memory_percent + '%';
+            }
+
+            if (data.disk_percent !== undefined) {
+                document.getElementById('diskMetric').textContent = data.disk_percent.toFixed(1) + '%';
+                document.getElementById('diskProgress').style.width = data.disk_percent + '%';
+            }
+
+            if (data.active_clients !== undefined) {
+                document.getElementById('clientsMetric').textContent = data.active_clients;
+            }
+
+            // Update chart
+            updateSystemMetricsChart(data);
+
+            // Store data for trends
+            metricsData.push(data);
+            if (metricsData.length > 50) { // Keep last 50 data points
+                metricsData.shift();
+            }
+        }
+
+        // Update system metrics chart
+        function updateSystemMetricsChart(data) {
+            const timestamp = new Date(data.timestamp).toLocaleTimeString();
+
+            // Add new data point
+            systemMetricsChart.data.labels.push(timestamp);
+            systemMetricsChart.data.datasets[0].data.push(data.cpu_percent || 0);
+            systemMetricsChart.data.datasets[1].data.push(data.memory_percent || 0);
+
+            // Keep only last 20 points
+            if (systemMetricsChart.data.labels.length > 20) {
+                systemMetricsChart.data.labels.shift();
+                systemMetricsChart.data.datasets[0].data.shift();
+                systemMetricsChart.data.datasets[1].data.shift();
+            }
+
+            systemMetricsChart.update();
+        }
+
+        // Update models display
+        function updateModelsDisplay(models) {
+            const container = document.getElementById('modelsContainer');
+
+            if (models.length === 0) {
+                container.innerHTML = '<div class="col-12"><div class="alert alert-info">No models loaded</div></div>';
+                return;
+            }
+
+            container.innerHTML = models.map(model => `
+                <div class="col-md-6 mb-3">
+                    <div class="card h-100">
+                        <div class="card-body">
+                            <h5 class="card-title">
+                                <i class="fas fa-cube text-primary"></i> ${model.name}
+                            </h5>
+                            <p class="card-text">
+                                <span class="badge bg-secondary">${model.type}</span>
+                                <span class="badge bg-${model.status === 'loaded' ? 'success' : 'warning'}">${model.status}</span>
+                            </p>
+                            <div class="row text-center">
+                                <div class="col-4">
+                                    <div class="metric-value small">${(model.accuracy * 100).toFixed(1)}%</div>
+                                    <div class="metric-label small">Accuracy</div>
+                                </div>
+                                <div class="col-4">
+                                    <div class="metric-value small">${model.latency}ms</div>
+                                    <div class="metric-label small">Latency</div>
+                                </div>
+                                <div class="col-4">
+                                    <div class="metric-value small">${model.memory_usage}MB</div>
+                                    <div class="metric-label small">Memory</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card-footer">
+                            <button class="btn btn-sm btn-outline-primary" onclick="testModel('${model.id}')">
+                                <i class="fas fa-play"></i> Test
+                            </button>
+                            <button class="btn btn-sm btn-outline-secondary" onclick="viewModelDetails('${model.id}')">
+                                <i class="fas fa-info-circle"></i> Details
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Update model status
+        function updateModelStatus(data) {
+            // Update model performance container
+            const container = document.getElementById('modelPerformanceContainer');
+
+            if (data.models && data.models.length > 0) {
+                container.innerHTML = data.models.map(model => `
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span>${model.id}</span>
+                        <span class="badge bg-success">${model.requests_per_second}/s</span>
+                    </div>
+                `).join('');
+            }
+        }
+
+        // Auto refresh functionality
+        function startAutoRefresh() {
+            setInterval(() => {
+                if (autoRefresh) {
+                    refreshMetrics();
+                }
+            }, 5000); // Refresh every 5 seconds
+        }
+
+        function toggleAutoRefresh() {
+            autoRefresh = !autoRefresh;
+            const button = document.getElementById('autoRefreshToggle');
+            const icon = button.querySelector('i');
+
+            if (autoRefresh) {
+                icon.className = 'fas fa-pause';
+                button.innerHTML = '<i class="fas fa-pause"></i> Pause Updates';
+                button.className = 'btn btn-sm btn-outline-secondary';
+            } else {
+                icon.className = 'fas fa-play';
+                button.innerHTML = '<i class="fas fa-play"></i> Resume Updates';
+                button.className = 'btn btn-sm btn-success';
+            }
+        }
+
+        // Action functions
+        async function runInferenceTest() {
+            try {
+                const response = await fetch('/api/inference', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        model_id: 'resnet50_edge',
+                        input: [0.1, 0.2, 0.3] // Mock input
+                    })
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    showNotification('Inference test completed successfully', 'success');
+                } else {
+                    showNotification('Inference test failed: ' + result.error, 'error');
+                }
+            } catch (error) {
+                showNotification('Error running inference test: ' + error.message, 'error');
+            }
+        }
+
+        async function refreshMetrics() {
+            try {
+                const response = await fetch('/api/system-info');
+                const data = await response.json();
+                updateSystemInfo(data);
+                showNotification('Metrics refreshed', 'info');
+            } catch (error) {
+                showNotification('Error refreshing metrics', 'error');
+            }
+        }
+
+        function exportReport() {
+            // Create and download a simple report
+            const reportData = {
+                timestamp: new Date().toISOString(),
+                metrics: metricsData.slice(-10), // Last 10 metrics
+                system_info: 'Generated from Quantum Edge AI Dashboard'
+            };
+
+            const blob = new Blob([JSON.stringify(reportData, null, 2)], {
+                type: 'application/json'
+            });
+
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `quantum-edge-report-${new Date().toISOString().split('T')[0]}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            showNotification('Report exported successfully', 'success');
+        }
+
+        function testModel(modelId) {
+            showNotification(`Testing model: ${modelId}`, 'info');
+            // Implement model testing logic
+        }
+
+        function viewModelDetails(modelId) {
+            showNotification(`Viewing details for: ${modelId}`, 'info');
+            // Implement model details view
+        }
+
+        function openSettings() {
+            showNotification('Settings panel not implemented yet', 'warning');
+        }
+
+        function exportData() {
+            exportReport();
+        }
+
+        function resetDashboard() {
+            if (confirm('Are you sure you want to reset the dashboard? This will clear all cached data.')) {
+                // Reset charts
+                systemMetricsChart.data.labels = [];
+                systemMetricsChart.data.datasets[0].data = [];
+                systemMetricsChart.data.datasets[1].data = [];
+                systemMetricsChart.update();
+
+                // Reset metrics
+                metricsData = [];
+
+                // Reset displays
+                document.getElementById('cpuMetric').textContent = '--';
+                document.getElementById('memoryMetric').textContent = '--';
+                document.getElementById('diskMetric').textContent = '--';
+                document.getElementById('clientsMetric').textContent = '--';
+
+                showNotification('Dashboard reset successfully', 'success');
+            }
+        }
+
+        // Notification system
+        function showNotification(message, type = 'info') {
+            // Simple notification - in production, use a proper notification library
+            const alertClass = {
+                'success': 'alert-success',
+                'error': 'alert-danger',
+                'warning': 'alert-warning',
+                'info': 'alert-info'
+            }[type] || 'alert-info';
+
+            const notification = document.createElement('div');
+            notification.className = `alert ${alertClass} alert-dismissible fade show position-fixed`;
+            notification.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
+            notification.innerHTML = `
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+
+            document.body.appendChild(notification);
+
+            // Auto remove after 5 seconds
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.remove();
+                }
+            }, 5000);
+        }
+
+        // Handle page visibility changes
+        document.addEventListener('visibilitychange', function() {
+            if (document.hidden) {
+                // Pause updates when page is not visible
+                autoRefresh = false;
+            } else {
+                // Resume updates when page becomes visible
+                autoRefresh = true;
+            }
+        });
+
+        // Handle window resize
+        window.addEventListener('resize', function() {
+            // Re-render charts on resize
+            setTimeout(() => {
+                if (systemMetricsChart) systemMetricsChart.resize();
+                if (quantumAdvantageChart) quantumAdvantageChart.resize();
+            }, 250);
+        });
+    </script>
+</body>
+</html>

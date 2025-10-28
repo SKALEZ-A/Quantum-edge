@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="/static/css/dashboard.css" rel="stylesheet">
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="/">
+                <i class="fas fa-brain"></i> Quantum Edge AI Platform
+            </a>
+            <div class="navbar-nav ms-auto">
+                <a class="nav-link" href="/"><i class="fas fa-tachometer-alt"></i> Dashboard</a>
+                <a class="nav-link active" href="/models"><i class="fas fa-cubes"></i> Models</a>
+                <a class="nav-link" href="/monitoring"><i class="fas fa-chart-line"></i> Monitoring</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid mt-4">
+        <div class="row">
+            <div class="col-12">
+                <h2><i class="fas fa-cubes text-primary"></i> Model Management</h2>
+
+                <div class="row mt-4">
+                    <div class="col-md-8">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="mb-0">Loaded Models</h5>
+                            </div>
+                            <div class="card-body">
+                                <div id="modelsList" class="row">
+                                    <!-- Models loaded dynamically -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-md-4">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="mb-0">Upload New Model</h5>
+                            </div>
+                            <div class="card-body">
+                                <form id="uploadForm" enctype="multipart/form-data">
+                                    <div class="mb-3">
+                                        <label class="form-label">Model File</label>
+                                        <input type="file" class="form-control" id="modelFile" accept=".pkl,.h5,.onnx">
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">Model Name</label>
+                                        <input type="text" class="form-control" id="modelName" placeholder="Enter model name">
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">Model Type</label>
+                                        <select class="form-select" id="modelType">
+                                            <option value="classification">Classification</option>
+                                            <option value="regression">Regression</option>
+                                            <option value="quantum">Quantum Model</option>
+                                        </select>
+                                    </div>
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fas fa-upload"></i> Upload Model
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Load models on page load
+        document.addEventListener('DOMContentLoaded', loadModels);
+
+        async function loadModels() {
+            try {
+                const response = await fetch('/api/models');
+                const models = await response.json();
+                displayModels(models);
+            } catch (error) {
+                console.error('Error loading models:', error);
+            }
+        }
+
+        function displayModels(models) {
+            const container = document.getElementById('modelsList');
+
+            if (models.length === 0) {
+                container.innerHTML = '<div class="col-12"><div class="alert alert-info">No models loaded</div></div>';
+                return;
+            }
+
+            container.innerHTML = models.map(model => `
+                <div class="col-md-6 mb-3">
+                    <div class="card h-100">
+                        <div class="card-body">
+                            <h5 class="card-title">${model.name}</h5>
+                            <p class="card-text">
+                                <span class="badge bg-secondary">${model.type}</span>
+                                <span class="badge bg-${model.status === 'loaded' ? 'success' : 'warning'}">${model.status}</span>
+                            </p>
+                            <div class="row text-center">
+                                <div class="col-4">
+                                    <strong>${(model.accuracy * 100).toFixed(1)}%</strong><br>
+                                    <small class="text-muted">Accuracy</small>
+                                </div>
+                                <div class="col-4">
+                                    <strong>${model.latency}ms</strong><br>
+                                    <small class="text-muted">Latency</small>
+                                </div>
+                                <div class="col-4">
+                                    <strong>${model.memory_usage}MB</strong><br>
+                                    <small class="text-muted">Memory</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card-footer">
+                            <button class="btn btn-sm btn-outline-primary" onclick="testModel('${model.id}')">
+                                Test Model
+                            </button>
+                            <button class="btn btn-sm btn-outline-danger" onclick="unloadModel('${model.id}')">
+                                Unload
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Handle model upload
+        document.getElementById('uploadForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+
+            const formData = new FormData();
+            const fileInput = document.getElementById('modelFile');
+            const modelName = document.getElementById('modelName').value;
+            const modelType = document.getElementById('modelType').value;
+
+            if (!fileInput.files[0]) {
+                alert('Please select a model file');
+                return;
+            }
+
+            formData.append('file', fileInput.files[0]);
+            formData.append('name', modelName);
+            formData.append('type', modelType);
+
+            try {
+                const response = await fetch('/api/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    alert('Model uploaded successfully!');
+                    loadModels(); // Refresh model list
+                } else {
+                    alert('Upload failed: ' + result.error);
+                }
+            } catch (error) {
+                alert('Upload error: ' + error.message);
+            }
+        });
+
+        function testModel(modelId) {
+            alert(`Testing model: ${modelId}`);
+            // Implement model testing
+        }
+
+        function unloadModel(modelId) {
+            if (confirm(`Are you sure you want to unload model ${modelId}?`)) {
+                alert(`Unloading model: ${modelId}`);
+                // Implement model unloading
+            }
+        }
+    </script>
+</body>
+</html>
